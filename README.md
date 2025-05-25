@@ -13,8 +13,8 @@ A simple Python GUI app to export, import, and modify playlists on a Plex Media 
 
 1. Clone this repository:
    ```bash
-   git clone <repo-url>
-   cd PlexPlaylistMaker
+   git clone https://github.com/jeffparker/PlexPlaylistApp.git
+   cd PlexPlaylistApp
    ```
 2. (Optional) Create and activate a virtual environment:
    ```bash

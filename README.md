@@ -40,7 +40,16 @@ python PlexPlaylistApp.py
 
 ## Configuration
 
-No additional configuration is required. Ensure your Plex server URL and token are set via environment variables or in `plex_utils.py`.
+**No configuration is required for most users!**
+
+By default, the app uses Plex's secure PIN login flow. When you run the app, a browser window opens for you to log in with your Plex account, and the app automatically connects to your server. This is the recommended and easiest method for most users—just run the app and follow the prompts.
+
+**Advanced/Automated Use:**
+- If you want to bypass the PIN login (for automation, scripts, or running on a headless server), you can supply your Plex server URL and authentication token either:
+  - As environment variables (`PLEX_URL` and `PLEX_TOKEN`), or
+  - By editing `plex_utils.py` to hardcode your credentials.
+
+Most users should not need to do this. These options are only for special circumstances, such as automated workflows or servers without a browser. If you are unsure, just use the default PIN login.
 
 ## Dependencies
 

@@ -1,4 +1,4 @@
-# Plex Playlist Exporter/Importer
+# Plex Playlist App
 
 A simple Python GUI app to export, import, and modify playlists on a Plex Media Server.
 
@@ -7,6 +7,7 @@ A simple Python GUI app to export, import, and modify playlists on a Plex Media 
 - **Export** playlists to JSON format
 - **Import** playlists from JSON (with rename and conflict handling)
 - **Modify** existing playlists: sort by year (and alphabetically for same-year items)
+- **Delete** one or more playlists from your Plex server with a checkbox-based interface
 - Feedback indicators and non-blocking UI using threads
 
 ## Installation
@@ -37,6 +38,7 @@ python PlexPlaylistApp.py
 2. Use the **Export** tab to select one or more playlists and export them to JSON.
 3. Use the **Import** tab to load a JSON file, optionally rename playlists, and import them back to Plex.
 4. Use the **Modify** tab to pick a playlist, sort its items by year (and title), and update the playlist on the server.
+5. Use the **Delete** tab to select one or more playlists (with checkboxes) and delete them from your Plex server. Click **Refresh Playlists** if you need to reload the list after changes.
 
 ## Configuration
 

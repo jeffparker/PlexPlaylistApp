@@ -1,0 +1,82 @@
+{
+  "export_date": "2025-05-25T19:29:47.154924",
+  "plex_server": "ParkerPlex",
+  "playlists": [
+    {
+      "name": "70s Missed Hits",
+      "description": "",
+      "items": [
+        {
+          "title": "Fat City",
+          "year": 1972,
+          "type": "movie",
+          "imdb_id": "movie/5d7768407e9a3c0020c6f04c",
+          "plex_rating_key": 39543
+        },
+        {
+          "title": "Sleuth",
+          "year": 1972,
+          "type": "movie",
+          "imdb_id": "movie/5d7768286f4521001ea9962d",
+          "plex_rating_key": 6151
+        },
+        {
+          "title": "Scarecrow",
+          "year": 1973,
+          "type": "movie",
+          "imdb_id": "movie/5d776d0e594b2b001e7002b6",
+          "plex_rating_key": 39408
+        },
+        {
+          "title": "A Woman Under the Influence",
+          "year": 1974,
+          "type": "movie",
+          "imdb_id": "movie/5d77685a0ea56a001e2a363b",
+          "plex_rating_key": 39538
+        },
+        {
+          "title": "Ali: Fear Eats the Soul",
+          "year": 1974,
+          "type": "movie",
+          "imdb_id": "movie/5d776d0c7a53e9001e74f84b",
+          "plex_rating_key": 417
+        },
+        {
+          "title": "Thunderbolt and Lightfoot",
+          "year": 1974,
+          "type": "movie",
+          "imdb_id": "movie/5d9f34f66fc551001ef7f751",
+          "plex_rating_key": 8974
+        },
+        {
+          "title": "Murder by Death",
+          "year": 1976,
+          "type": "movie",
+          "imdb_id": "movie/5d776830eb5d26001f1dfa89",
+          "plex_rating_key": 39540
+        },
+        {
+          "title": "Sleeping Dogs",
+          "year": 1977,
+          "type": "movie",
+          "imdb_id": "movie/5d77686bfb0d55001f50fb89",
+          "plex_rating_key": 39542
+        },
+        {
+          "title": "An Unmarried Woman",
+          "year": 1978,
+          "type": "movie",
+          "imdb_id": "movie/5d77686eeb5d26001f1eb336",
+          "plex_rating_key": 39539
+        },
+        {
+          "title": "The Silent Partner",
+          "year": 1978,
+          "type": "movie",
+          "imdb_id": "movie/5d9f3553e4fc29001eb665f5",
+          "plex_rating_key": 8656
+        }
+      ]
+    }
+  ]
+}

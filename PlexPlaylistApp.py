@@ -59,10 +59,12 @@ class PlexPlaylistExporterImporter(ctk.CTk):
         self.tabview.add("Export")
         self.tabview.add("Import")
         self.tabview.add("Modify")
+        self.tabview.add("Delete")
         self.setup_export_tab()
         self.setup_import_tab()
         self.setup_modify_tab()
-
+        self.setup_delete_tab()
+        
         # Register graceful shutdown handler
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -122,7 +124,7 @@ class PlexPlaylistExporterImporter(ctk.CTk):
         self.server_var.set(name)
         self.server_menu.configure(values=[name])
         self.status_label.configure(text=f"Connected to Plex: {name}")
-        self.connect_btn.configure(state=ctk.NORMAL)
+        self.connect_btn.configure(state=ctk.DISABLED)
         # Fetch all playlists and store in self.playlists
         try:
             self.export_refresh_btn.configure(state=ctk.DISABLED)
@@ -136,11 +138,14 @@ class PlexPlaylistExporterImporter(ctk.CTk):
         # Prepopulate Export and Modify tabs
         self.load_playlists()
         self.load_modify_playlists()
+        self.load_delete_playlists()
         self.export_refresh_btn.configure(state=ctk.NORMAL)
         self.modify_refresh_btn.configure(state=ctk.NORMAL)
         self.export_selected_btn.configure(state=ctk.NORMAL)
         self.import_selected_btn.configure(state=ctk.NORMAL)
         self.modify_selected_btn.configure(state=ctk.NORMAL)
+        self.delete_refresh_btn.configure(state=ctk.NORMAL)
+        self.delete_selected_btn.configure(state=ctk.NORMAL)
 
     def _on_connect_error(self, error: Exception) -> None:
         """
@@ -150,7 +155,7 @@ class PlexPlaylistExporterImporter(ctk.CTk):
             error (Exception): Exception encountered during connection.
         """
         self.status_label.configure(text=str(error))
-        self.connect_btn.configure(state=ctk.NORMAL)
+        self.connect_btn.configure(state=ctk.DISABLED)
         CTkMessagebox(title="Error", message=str(error))
 
     def setup_export_tab(self) -> None:
@@ -344,16 +349,63 @@ class PlexPlaylistExporterImporter(ctk.CTk):
         if not rename_map:
             CTkMessagebox(title="Error", message="No playlists to import after resolving conflicts")
             return
-        def task():
+        cancel_event = threading.Event()
+        progress_dialog = ctk.CTkToplevel(self)
+        progress_dialog.title("Importing Playlists")
+        dialog_w, dialog_h = 400, 150
+        scr_w = self.winfo_screenwidth()
+        scr_h = self.winfo_screenheight()
+        x = (scr_w - dialog_w) // 2
+        y = (scr_h - dialog_h) // 2
+        progress_dialog.geometry(f"{dialog_w}x{dialog_h}+{x}+{y}")
+        progress_dialog.grab_set()  # Modal
+        progress_dialog.attributes('-topmost', True)
+        self.attributes('-disabled', True)
+        progress_label = ctk.CTkLabel(progress_dialog, text="Starting import...")
+        progress_label.pack(pady=(20, 10))
+        progress_bar = ctk.CTkProgressBar(progress_dialog, orientation="horizontal", width=300)
+        progress_bar.pack(pady=10)
+        progress_bar.set(0)
+        cancel_btn = ctk.CTkButton(progress_dialog, text="Cancel Import", command=cancel_event.set)
+        cancel_btn.pack(pady=10)
+        def update_progress(current, total):
+            percent = current / total if total else 0
+            self.after(0, lambda: progress_bar.set(percent))
+            self.after(0, lambda: progress_label.configure(text=f"Importing... {current} / {total}"))
+        def run_import():
             try:
-                res = playlist_io.import_from_file(self.server, self.file_path, rename_map)
-                CTkMessagebox(title="Import Results", message=res)
-                # Automatically refresh playlists in Export and Modify tabs
+                res = playlist_io.import_from_file(self.server, self.file_path, rename_map, progress_callback=update_progress, cancel_event=cancel_event)
+                # Check if Missing Movies.json was created and append explanation if so
+                missing_path = os.path.join(os.getcwd(), "Missing Movies.json")
+                extra_msg = ""
+                if os.path.exists(missing_path):
+                    try:
+                        with open(missing_path, "r", encoding="utf-8") as f:
+                            import json as _json
+                            try:
+                                missing_list = _json.load(f)
+                            except Exception:
+                                missing_list = []
+                        if missing_list:
+                            extra_msg = ("\n\nSome movies were not imported because they were not found on your Plex server. "
+                                         "A list of missing movies has been saved as 'Missing Movies.json'.")
+                        else:
+                            os.remove(missing_path)
+                    except Exception:
+                        pass
+                def show_results_and_focus():
+                    CTkMessagebox(title="Import Results", message=res + extra_msg)
+                    self.focus_force()
+                self.after(0, show_results_and_focus)
                 self.after(0, self._refresh_export_playlists)
                 self.after(0, self._refresh_modify_playlists)
+                self.after(0, self._refresh_delete_playlists)
             except Exception as e:
-                CTkMessagebox(title="Error", message=str(e))
-        threading.Thread(target=task, daemon=True).start()
+                self.after(0, lambda: CTkMessagebox(title="Error", message=str(e)))
+            finally:
+                self.after(0, lambda: progress_dialog.destroy())
+                self.after(0, lambda: self.attributes('-disabled', False))
+        threading.Thread(target=run_import, daemon=True).start()
 
     def setup_modify_tab(self):
         frame = self.tabview.tab("Modify")
@@ -413,6 +465,71 @@ class PlexPlaylistExporterImporter(ctk.CTk):
             os.remove(path)
         except OSError:
             pass
+
+    def setup_delete_tab(self):
+        frame = self.tabview.tab("Delete")
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=1)
+        frame.grid_rowconfigure(1, weight=1)
+        self.delete_refresh_btn = ctk.CTkButton(frame, text="Refresh Playlists", command=self._refresh_delete_playlists, state=ctk.DISABLED)
+        self.delete_refresh_btn.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
+        self.delete_frame = ctk.CTkFrame(frame)
+        self.delete_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+        self.delete_vars = {}
+        self.delete_selected_btn = ctk.CTkButton(frame, text="Delete Selected Playlists from Plex Server", command=self.delete_selected_playlists, state=ctk.DISABLED)
+        self.delete_selected_btn.grid(row=2, column=0, columnspan=2, padx=10, pady=5, sticky="ew")
+
+    def _refresh_delete_playlists(self):
+        self.delete_refresh_btn.configure(state=ctk.DISABLED)
+        self.delete_selected_btn.configure(state=ctk.DISABLED)
+        def task():
+            try:
+                self.playlists = plex_utils.get_playlists(self.server)
+            except Exception:
+                self.playlists = []
+            self.after(0, self.load_delete_playlists)
+            self.after(0, lambda: self.delete_refresh_btn.configure(state=ctk.NORMAL))
+            self.after(0, lambda: self.delete_selected_btn.configure(state=ctk.NORMAL))
+        threading.Thread(target=task, daemon=True).start()
+
+    def load_delete_playlists(self):
+        for w in self.delete_frame.winfo_children():
+            w.destroy()
+        if not self.server:
+            CTkMessagebox(title="Error", message="Not connected to Plex")
+            return
+        pls = getattr(self, 'playlists', None)
+        if pls is None:
+            pls = plex_utils.get_playlists(self.server)
+            self.playlists = pls
+        self.delete_vars = {}
+        for i, pl in enumerate(pls):
+            var = tk.BooleanVar()
+            ctk.CTkCheckBox(self.delete_frame, text=pl.title, variable=var).grid(row=i, column=0, sticky="w")
+            self.delete_vars[pl.title] = (var, pl)
+
+    def delete_selected_playlists(self):
+        selected = [(name, pl) for name, (var, pl) in self.delete_vars.items() if var.get()]
+        if not selected:
+            CTkMessagebox(title="Error", message="No playlists selected")
+            return
+        if not messagebox.askyesno("Confirm Deletion", f"Are you sure you want to delete {len(selected)} playlist(s) from your Plex server?"):
+            return
+        def task():
+            errors = []
+            for name, pl in selected:
+                try:
+                    pl.delete()
+                except Exception as e:
+                    errors.append(f"{name}: {e}")
+            if errors:
+                self.after(0, lambda: CTkMessagebox(title="Delete Results", message="Some playlists could not be deleted:\n" + "\n".join(errors)))
+            else:
+                self.after(0, lambda: CTkMessagebox(title="Delete Results", message="Selected playlists deleted successfully."))
+            self.after(0, self._refresh_export_playlists)
+            self.after(0, self._refresh_modify_playlists)
+            self.after(0, self._refresh_delete_playlists)
+        threading.Thread(target=task, daemon=True).start()
 
 def main():
     app = PlexPlaylistExporterImporter()

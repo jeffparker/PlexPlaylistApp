@@ -77,7 +77,7 @@ def preview_import(file_path: str) -> list:
         names = [os.path.splitext(os.path.basename(file_path))[0]]
     return names
 
-def import_from_file(server: object, file_path: str, rename_map: dict) -> str:
+def import_from_file(server: object, file_path: str, rename_map: dict, progress_callback=None, cancel_event=None) -> str:
     """
     Import playlists from a JSON or CSV file into Plex, matching media items and handling renames.
 
@@ -90,6 +90,7 @@ def import_from_file(server: object, file_path: str, rename_map: dict) -> str:
         str: Summary of import results for each playlist.
     """
     results = []
+    missing_movies = []
     if file_path.lower().endswith(".json"):
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -100,12 +101,25 @@ def import_from_file(server: object, file_path: str, rename_map: dict) -> str:
             new_name = rename_map[original]
             items = pl.get("items", [])
             matched = []
-            for item in items:
+            total = len(items)
+            for idx, item in enumerate(items):
+                if cancel_event and cancel_event.is_set():
+                    results.append(f"{new_name}: Import cancelled at {idx}/{total}")
+                    break
                 media = find_media_in_plex(server, item)
                 if media:
                     matched.append(media)
-            server.createPlaylist(new_name, items=matched)
-            results.append(f"{new_name}: added {len(matched)}/{len(items)}")
+                else:
+                    missing_movies.append(item)
+                if progress_callback:
+                    progress_callback(idx + 1, total)
+            else:
+                try:
+                    server.createPlaylist(new_name, items=matched)
+                except Exception as e:
+                    results.append(f"{new_name}: ERROR {e}")
+                else:
+                    results.append(f"{new_name}: added {len(matched)}/{len(items)}")
     else:
         with open(file_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -115,13 +129,31 @@ def import_from_file(server: object, file_path: str, rename_map: dict) -> str:
             new_name = rename_map[playlist_name]
             items = list(reader)
             matched = []
-            for item in items:
+            total = len(items)
+            for idx, item in enumerate(items):
+                if cancel_event and cancel_event.is_set():
+                    results.append(f"{new_name}: Import cancelled at {idx}/{total}")
+                    break
                 media = find_media_in_plex(server, item)
                 if media:
                     matched.append(media)
-            server.createPlaylist(new_name, items=matched)
-            results.append(f"{new_name}: added {len(matched)}/{len(items)}")
+                else:
+                    missing_movies.append(item)
+                if progress_callback:
+                    progress_callback(idx + 1, total)
+            else:
+                try:
+                    server.createPlaylist(new_name, items=matched)
+                except Exception as e:
+                    results.append(f"{new_name}: ERROR {e}")
+                else:
+                    results.append(f"{new_name}: added {len(matched)}/{len(items)}")
+    # Save missing movies to JSON if any
+    if missing_movies:
+        with open("Missing Movies.json", "w", encoding="utf-8") as f:
+            json.dump(missing_movies, f, indent=2)
     return "\n".join(results)
+
 
 def find_media_in_plex(server: object, item: dict) -> object | None:
     """
@@ -141,16 +173,29 @@ def find_media_in_plex(server: object, item: dict) -> object | None:
             return server.fetchItem(item["plex_rating_key"])
         except Exception:
             pass
-    # Try by external IDs
+    # Use Movies section for searching
+    try:
+        movies_section = server.library.section('Movies')
+    except Exception:
+        return None
+    # Try by external IDs (IMDB)
     if item.get("imdb_id"):
-        results = server.search(guid=f"imdb://{item['imdb_id']}")
-        if results:
-            return results[0]
+        imdb_id = item["imdb_id"]
+        # Search by title and year if available, else by title
+        if item.get("year"):
+            results = movies_section.search(title=item["title"], year=item["year"])
+        else:
+            results = movies_section.search(title=item["title"])
+        # Filter results by IMDB ID in guid
+        for result in results:
+            guid = getattr(result, 'guid', '')
+            if imdb_id in guid:
+                return result
     # Try by title and year
     if item.get("year"):
-        results = server.search(title=item["title"], year=item["year"])
+        results = movies_section.search(title=item["title"], year=item["year"])
         if results:
             return results[0]
     # Fallback to title only
-    results = server.search(title=item["title"])
+    results = movies_section.search(title=item["title"])
     return results[0] if results else None

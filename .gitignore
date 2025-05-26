@@ -33,3 +33,6 @@ coverage.xml
 # Environment / Logs
 .env
 *.log
+
+# App generated files
+Missing Movies.json
